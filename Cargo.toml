@@ -9,30 +9,10 @@ readme = "README.md"
 documentation = "https://docs.rs/rustcrypt"
 keywords = [
     "crypto",
-    "cryptography",
     "encryption",
-    "decryption",
-    "aes",
     "aes-gcm",
-    "argon2",
-    "kdf",
-    "key-derivation",
-    "authenticated-encryption",
-    "layered-encryption",
-    "password-based-encryption",
-    "runtime-decryption",
     "obfuscator",
     "security",
-    "secure-storage",
-    "cipher",
-    "ciphersuite",
-    "secret-management",
-    "data-protection",
-    "confidentiality",
-    "integrity",
-    "privacy",
-    "secure-communication",
-    "rustcrypt"
 ]
 categories = ["cryptography"]
 
