@@ -1,1 +1,14 @@
+# rust cargo
 /target
+**/*.rs.bk
+Cargo.lock
+
+# editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# operating system files
+.DS_Store
+Thumbs.db

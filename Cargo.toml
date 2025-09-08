@@ -1,10 +1,10 @@
 [package]
 name = "rustcrypt"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 edition = "2021"
 authors = ["Arthur Bernard"]
-description = "runtime-safe AES-GCM for sensitive data"
-license = "Unlicense"
+description = "Runtime-safe AES-GCM encryption for protecting secrets in Rust applications"
+license = "MIT"
 readme = "README.md"
 documentation = "https://docs.rs/rustcrypt"
 keywords = [
@@ -14,7 +14,14 @@ keywords = [
     "obfuscator",
     "security",
 ]
-categories = ["cryptography"]
+categories = [
+    "cryptography",
+    "encryption",
+    "security",
+    "data-protection",
+    "obfuscator",
+    "obfuscation",
+]
 
 [dependencies]
 aes-gcm = { version = "0.10", features = ["aes"] }
@@ -34,6 +41,6 @@ name = "rustcrypt"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["hardware-keys", "ephemeral-sessions"]
 ephemeral-sessions = []
-
+hardware-keys = []
