@@ -1,12 +1,15 @@
-use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Nonce};
-use rand::{RngCore, Rng};
-use secrecy::{ExposeSecret, SecretVec};
-use zeroize::{Zeroize, Zeroizing};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Nonce,
+};
 use hkdf::Hkdf;
+use rand::{Rng, RngCore};
+use secrecy::{ExposeSecret, SecretVec};
 use sha2::Sha256;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+use zeroize::{Zeroize, Zeroizing};
 
 pub const DEFAULT_KEY_LEN: usize = 32;
 pub const DEFAULT_NONCE_LEN: usize = 12;
@@ -53,11 +56,15 @@ pub enum EncryptionLayers {
 }
 
 impl Default for EncryptionLayers {
-    fn default() -> Self { EncryptionLayers::Double }
+    fn default() -> Self {
+        EncryptionLayers::Double
+    }
 }
 
 fn to_key(key: &SecretVec<u8>) -> Result<aes_gcm::Key<aes_gcm::aes::Aes256>, RustcryptError> {
-    if key.expose_secret().len() != DEFAULT_KEY_LEN { return Err(RustcryptError::InvalidKey); }
+    if key.expose_secret().len() != DEFAULT_KEY_LEN {
+        return Err(RustcryptError::InvalidKey);
+    }
     Ok(aes_gcm::Key::<aes_gcm::aes::Aes256>::from_slice(key.expose_secret()).to_owned())
 }
 
@@ -78,7 +85,7 @@ fn obfuscate_control_flow(mut value: u8, rounds: usize) -> u8 {
 fn derive_military_key(base_key: &[u8], context: &[u8]) -> [u8; 32] {
     let mut derived = [0u8; 32];
     let mut rng = rand::thread_rng();
-    
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -90,7 +97,7 @@ fn derive_military_key(base_key: &[u8], context: &[u8]) -> [u8; 32] {
             let context_byte = context[i % context.len()];
             let round_byte = (round as u8).wrapping_add(i as u8);
             let time_byte = ((timestamp >> (i % 8)) & 0xFF) as u8;
-            
+
             round_key[i] = base_byte
                 .wrapping_add(context_byte)
                 .wrapping_add(round_byte)
@@ -109,7 +116,7 @@ fn derive_military_key(base_key: &[u8], context: &[u8]) -> [u8; 32] {
             derived[i] = derived[i].wrapping_add(((entropy_val >> (i % 4)) & 0xFF) as u8);
         }
     }
-    
+
     derived
 }
 
@@ -124,11 +131,10 @@ fn generate_junk_data() -> Vec<u8> {
             junk[i + 3] = 0x16;
         }
     }
-    
+
     junk
 }
 
- 
 #[derive(Clone)]
 pub struct ObfuscatedKey {
     fragments: HashMap<usize, u8>,
@@ -180,7 +186,8 @@ impl ObfuscatedKey {
         let mut bit_count = 0;
         let mut byte_idx = 0;
         for &pos in &bit_positions {
-            if let (Some(&fragment), Some(&mask)) = (self.fragments.get(&pos), self.masks.get(&pos)) {
+            if let (Some(&fragment), Some(&mask)) = (self.fragments.get(&pos), self.masks.get(&pos))
+            {
                 let mut deobfuscated_bit = fragment ^ (mask & 1);
                 for _ in 0..self.obfuscation_level {
                     deobfuscated_bit = obfuscate_control_flow(deobfuscated_bit, 1);
@@ -259,7 +266,7 @@ impl<const N: usize> StackSecret<N> {
         secret.data[..data.len()].copy_from_slice(data);
         Ok(secret)
     }
-    
+
     pub fn as_slice(&self) -> &[u8] {
         &self.data[..self.len]
     }
@@ -271,7 +278,11 @@ impl<const N: usize> Drop for StackSecret<N> {
     }
 }
 
-pub fn hide_layered(input: &[u8], key: &SecretVec<u8>, layers: EncryptionLayers) -> Result<Vec<u8>, RustcryptError> {
+pub fn hide_layered(
+    input: &[u8],
+    key: &SecretVec<u8>,
+    layers: EncryptionLayers,
+) -> Result<Vec<u8>, RustcryptError> {
     match layers {
         EncryptionLayers::Single => hide_single(input, key),
         EncryptionLayers::Double => hide_double(input, key),
@@ -289,12 +300,14 @@ fn hide_single(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptEr
     let cipher = Aes256Gcm::new(&key);
     let nonce_bytes = gen_nonce();
     let nonce = Nonce::from_slice(&nonce_bytes);
-    
+
     let mut obfuscated_input = input.to_vec();
     for i in 0..obfuscated_input.len() {
         obfuscated_input[i] = obfuscate_control_flow(obfuscated_input[i], OBFUSCATION_ROUNDS);
     }
-    let ct = cipher.encrypt(nonce, obfuscated_input.as_slice()).map_err(|_| RustcryptError::Encrypt)?;
+    let ct = cipher
+        .encrypt(nonce, obfuscated_input.as_slice())
+        .map_err(|_| RustcryptError::Encrypt)?;
     let mut obfuscated_ct = ct;
     for i in 0..obfuscated_ct.len() {
         obfuscated_ct[i] = obfuscate_control_flow(obfuscated_ct[i], OBFUSCATION_ROUNDS);
@@ -314,13 +327,16 @@ fn hide_double(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptEr
     rand::thread_rng().fill_bytes(&mut salt);
     let hk = Hkdf::<Sha256>::new(Some(&salt), key.expose_secret());
     let mut xkey = [0u8; 32];
-    hk.expand(b"double/xchacha", &mut xkey).map_err(|_| RustcryptError::Encrypt)?;
+    hk.expand(b"double/xchacha", &mut xkey)
+        .map_err(|_| RustcryptError::Encrypt)?;
 
     let xchacha = XChaCha20Poly1305::new_from_slice(&xkey).map_err(|_| RustcryptError::Encrypt)?;
     let mut xnonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut xnonce_bytes);
     let xnonce = XNonce::from_slice(&xnonce_bytes);
-    let xct = xchacha.encrypt(xnonce, stage1.as_ref()).map_err(|_| RustcryptError::Encrypt)?;
+    let xct = xchacha
+        .encrypt(xnonce, stage1.as_ref())
+        .map_err(|_| RustcryptError::Encrypt)?;
 
     let mut out = Vec::with_capacity(16 + 24 + xct.len());
     out.extend_from_slice(&salt);
@@ -335,7 +351,8 @@ fn hide_triple(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptEr
     rand::thread_rng().fill_bytes(&mut salt);
     let hk = Hkdf::<Sha256>::new(Some(&salt), key.expose_secret());
     let mut stream_mask = vec![0u8; stage2.len()];
-    hk.expand(b"triple/mask", &mut stream_mask).map_err(|_| RustcryptError::Encrypt)?;
+    hk.expand(b"triple/mask", &mut stream_mask)
+        .map_err(|_| RustcryptError::Encrypt)?;
 
     let mut obfuscated = stage2.clone();
     for (i, byte) in obfuscated.iter_mut().enumerate() {
@@ -348,7 +365,11 @@ fn hide_triple(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptEr
     Ok(out)
 }
 
-pub fn reveal_layered(input: &[u8], key: &SecretVec<u8>, layers: EncryptionLayers) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
+pub fn reveal_layered(
+    input: &[u8],
+    key: &SecretVec<u8>,
+    layers: EncryptionLayers,
+) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
     match layers {
         EncryptionLayers::Single => reveal_single(input, key),
         EncryptionLayers::Double => reveal_double(input, key),
@@ -362,17 +383,21 @@ pub fn reveal(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>, R
 }
 
 fn reveal_single(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
-    if input.len() < DEFAULT_NONCE_LEN { return Err(RustcryptError::MalformedInput); }
+    if input.len() < DEFAULT_NONCE_LEN {
+        return Err(RustcryptError::MalformedInput);
+    }
     let key = to_key(key)?;
     let cipher = Aes256Gcm::new(&key);
     let (nonce_part, ct) = input.split_at(DEFAULT_NONCE_LEN);
     let nonce = Nonce::from_slice(nonce_part);
-    
+
     let mut deobfuscated_ct = ct.to_vec();
     for i in 0..deobfuscated_ct.len() {
         deobfuscated_ct[i] = obfuscate_control_flow(deobfuscated_ct[i], OBFUSCATION_ROUNDS);
     }
-    let mut pt = cipher.decrypt(nonce, deobfuscated_ct.as_slice()).map_err(|_| RustcryptError::Decrypt)?;
+    let mut pt = cipher
+        .decrypt(nonce, deobfuscated_ct.as_slice())
+        .map_err(|_| RustcryptError::Decrypt)?;
     for i in 0..pt.len() {
         pt[i] = obfuscate_control_flow(pt[i], OBFUSCATION_ROUNDS);
     }
@@ -382,25 +407,33 @@ fn reveal_single(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>
 fn reveal_double(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
     use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 
-    if input.len() < 16 + 24 { return Err(RustcryptError::MalformedInput); }
+    if input.len() < 16 + 24 {
+        return Err(RustcryptError::MalformedInput);
+    }
 
     let (salt_part, rest) = input.split_at(16);
     let (xnonce_part, xct) = rest.split_at(24);
     let hk = Hkdf::<Sha256>::new(Some(salt_part), key.expose_secret());
     let mut xkey = [0u8; 32];
-    hk.expand(b"double/xchacha", &mut xkey).map_err(|_| RustcryptError::Decrypt)?;
+    hk.expand(b"double/xchacha", &mut xkey)
+        .map_err(|_| RustcryptError::Decrypt)?;
     let xchacha = XChaCha20Poly1305::new_from_slice(&xkey).map_err(|_| RustcryptError::Decrypt)?;
     let xnonce = XNonce::from_slice(xnonce_part);
-    let stage1 = xchacha.decrypt(xnonce, xct).map_err(|_| RustcryptError::Decrypt)?;
+    let stage1 = xchacha
+        .decrypt(xnonce, xct)
+        .map_err(|_| RustcryptError::Decrypt)?;
     reveal_single(&stage1, key)
 }
 
 fn reveal_triple(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
-    if input.len() < 16 { return Err(RustcryptError::MalformedInput); }
+    if input.len() < 16 {
+        return Err(RustcryptError::MalformedInput);
+    }
     let (salt_part, obfuscated) = input.split_at(16);
     let hk = Hkdf::<Sha256>::new(Some(salt_part), key.expose_secret());
     let mut stream_mask = vec![0u8; obfuscated.len()];
-    hk.expand(b"triple/mask", &mut stream_mask).map_err(|_| RustcryptError::Decrypt)?;
+    hk.expand(b"triple/mask", &mut stream_mask)
+        .map_err(|_| RustcryptError::Decrypt)?;
     let mut deobfuscated = obfuscated.to_vec();
     for (i, byte) in deobfuscated.iter_mut().enumerate() {
         *byte ^= stream_mask[i];
@@ -414,7 +447,8 @@ fn hide_military(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, Rustcrypt
     rand::thread_rng().fill_bytes(&mut salt);
     let hk = Hkdf::<Sha256>::new(Some(&salt), key.expose_secret());
     let mut military_key = [0u8; 32];
-    hk.expand(b"military_encryption", &mut military_key).map_err(|_| RustcryptError::Encrypt)?;
+    hk.expand(b"military_encryption", &mut military_key)
+        .map_err(|_| RustcryptError::Encrypt)?;
     let military_secret = SecretVec::new(military_key.to_vec());
     let military_encrypted = hide_triple(&triple_encrypted, &military_secret)?;
     let mut final_obfuscated = military_encrypted;
@@ -430,10 +464,17 @@ fn hide_military(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, Rustcrypt
     Ok(output)
 }
 
-fn reveal_military(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
-    if input.len() < 4 { return Err(RustcryptError::MalformedInput); }
+fn reveal_military(
+    input: &[u8],
+    key: &SecretVec<u8>,
+) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
+    if input.len() < 4 {
+        return Err(RustcryptError::MalformedInput);
+    }
     let junk_len = u32::from_le_bytes([input[0], input[1], input[2], input[3]]) as usize;
-    if input.len() < 4 + junk_len + 16 { return Err(RustcryptError::MalformedInput); }
+    if input.len() < 4 + junk_len + 16 {
+        return Err(RustcryptError::MalformedInput);
+    }
     let after_junk = &input[4 + junk_len..];
     let (salt_part, encrypted_data) = after_junk.split_at(16);
     let mut deobfuscated = encrypted_data.to_vec();
@@ -442,7 +483,8 @@ fn reveal_military(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8
     }
     let hk = Hkdf::<Sha256>::new(Some(salt_part), key.expose_secret());
     let mut military_key = [0u8; 32];
-    hk.expand(b"military_encryption", &mut military_key).map_err(|_| RustcryptError::Decrypt)?;
+    hk.expand(b"military_encryption", &mut military_key)
+        .map_err(|_| RustcryptError::Decrypt)?;
     let military_secret = SecretVec::new(military_key.to_vec());
     let triple_decrypted = reveal_triple(&deobfuscated, &military_secret)?;
     reveal_triple(&triple_decrypted, key)
@@ -464,9 +506,9 @@ impl Rustcrypt {
         Self::with_config(option, EncryptionLayers::default(), false)
     }
     pub fn with_config(
-        key_option: Option<&[u8]>, 
-        layers: EncryptionLayers, 
-        use_ephemeral: bool
+        key_option: Option<&[u8]>,
+        layers: EncryptionLayers,
+        use_ephemeral: bool,
     ) -> Result<Self, RustcryptError> {
         let key_vec = match key_option {
             Some(k) if k.len() == DEFAULT_KEY_LEN => SecretVec::new(k.to_vec()),
@@ -481,19 +523,19 @@ impl Rustcrypt {
                 }
             }
         };
-        Ok(Self { 
-            key: key_vec, 
-            layers, 
-            use_ephemeral 
+        Ok(Self {
+            key: key_vec,
+            layers,
+            use_ephemeral,
         })
     }
-    
+
     pub fn with_hardware_key(layers: EncryptionLayers) -> Result<Self, RustcryptError> {
         let key = gen_hardware_key()?;
-        Ok(Self { 
-            key, 
-            layers, 
-            use_ephemeral: false 
+        Ok(Self {
+            key,
+            layers,
+            use_ephemeral: false,
         })
     }
 
@@ -511,7 +553,10 @@ impl Rustcrypt {
     pub fn reveal_bytes(&self, input: &[u8]) -> Result<Zeroizing<Vec<u8>>, RustcryptError> {
         reveal_layered(input, &self.key, self.layers)
     }
-    pub fn hide_stack<const N: usize>(&self, input: &[u8]) -> Result<StackSecret<N>, RustcryptError> {
+    pub fn hide_stack<const N: usize>(
+        &self,
+        input: &[u8],
+    ) -> Result<StackSecret<N>, RustcryptError> {
         if input.len() > N {
             return Err(RustcryptError::StackTooLarge);
         }
@@ -527,8 +572,7 @@ impl Rustcrypt {
 }
 
 impl Drop for Rustcrypt {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }
 
 impl ObfuscatedRustcrypt {
@@ -575,8 +619,7 @@ impl ObfuscatedRustcrypt {
 }
 
 impl Drop for ObfuscatedRustcrypt {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }
 
 pub use secrecy::SecretVec as SecretVecAlias;
@@ -587,4 +630,3 @@ macro_rules! encrypt_literal {
         $lit.as_bytes()
     }};
 }
-
