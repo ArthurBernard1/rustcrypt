@@ -15,11 +15,8 @@ keywords = [
     "security",
 ]
 categories = [
-    "encryption",
+    "cryptography",
     "security",
-    "data-protection",
-    "obfuscator",
-    "obfuscation",
 ]
 
 [dependencies]
