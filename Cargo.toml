@@ -15,7 +15,6 @@ keywords = [
     "security",
 ]
 categories = [
-    "cryptography",
     "encryption",
     "security",
     "data-protection",
