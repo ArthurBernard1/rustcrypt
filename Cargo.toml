@@ -30,7 +30,7 @@ hkdf = "0.12"
 sha2 = "0.10"
 base64 = "0.22"
 secrecy = "0.8"
-rustcrypt-ct-macros = { path = "rustcrypt-ct-macros" }
+rustcrypt-ct-macros = { version = "0.1.0", path = "rustcrypt-ct-macros" }
 pbkdf2 = "0.12"
 
 [lib]
