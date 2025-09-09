@@ -47,18 +47,13 @@ impl std::fmt::Display for RustcryptError {
 
 impl std::error::Error for RustcryptError {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub enum EncryptionLayers {
     Single,
+    #[default]
     Double,
     Triple,
     Military,
-}
-
-impl Default for EncryptionLayers {
-    fn default() -> Self {
-        EncryptionLayers::Double
-    }
 }
 
 fn to_key(key: &SecretVec<u8>) -> Result<aes_gcm::Key<aes_gcm::aes::Aes256>, RustcryptError> {
@@ -92,28 +87,28 @@ fn derive_military_key(base_key: &[u8], context: &[u8]) -> [u8; 32] {
         .as_nanos() as u64;
     for round in 0..KEY_DERIVATION_ROUNDS {
         let mut round_key = [0u8; 32];
-        for i in 0..32 {
+        for (i, slot) in round_key.iter_mut().enumerate() {
             let base_byte = base_key[i % base_key.len()];
             let context_byte = context[i % context.len()];
             let round_byte = (round as u8).wrapping_add(i as u8);
             let time_byte = ((timestamp >> (i % 8)) & 0xFF) as u8;
 
-            round_key[i] = base_byte
+            *slot = base_byte
                 .wrapping_add(context_byte)
                 .wrapping_add(round_byte)
                 .wrapping_add(time_byte);
         }
-        for i in 0..32 {
-            round_key[i] = obfuscate_control_flow(round_key[i], OBFUSCATION_ROUNDS);
+        for byte in &mut round_key {
+            *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS);
         }
-        for i in 0..32 {
-            derived[i] ^= round_key[i];
+        for (d, rk) in derived.iter_mut().zip(round_key.iter()) {
+            *d ^= *rk;
         }
         let mut entropy = [0u8; 4];
         rng.fill_bytes(&mut entropy);
         let entropy_val = u32::from_le_bytes(entropy);
-        for i in 0..32 {
-            derived[i] = derived[i].wrapping_add(((entropy_val >> (i % 4)) & 0xFF) as u8);
+        for (i, d) in derived.iter_mut().enumerate() {
+            *d = d.wrapping_add(((entropy_val >> (i % 4)) & 0xFF) as u8);
         }
     }
 
@@ -153,7 +148,7 @@ impl ObfuscatedKey {
         let mut masks = HashMap::new();
         let junk_data = generate_junk_data();
         let derived_key = derive_military_key(key, b"military_grade_context");
-        for (_, &byte) in derived_key.iter().enumerate() {
+        for &byte in derived_key.iter() {
             for bit_idx in 0..8 {
                 let bit = (byte >> bit_idx) & 1;
                 let fragment_pos = rng.gen_range(0..FRAGMENT_SPACE_SIZE);
@@ -206,9 +201,9 @@ impl ObfuscatedKey {
         if byte_idx != self.key_len {
             return Err(RustcryptError::MalformedInput);
         }
-        for i in 0..key.len() {
+        for (i, k) in key.iter_mut().enumerate() {
             let junk_idx = i % self.junk_data.len();
-            key[i] = key[i].wrapping_sub(self.junk_data[junk_idx]);
+            *k = k.wrapping_sub(self.junk_data[junk_idx]);
         }
         Ok(key)
     }
@@ -302,15 +297,15 @@ fn hide_single(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptEr
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     let mut obfuscated_input = input.to_vec();
-    for i in 0..obfuscated_input.len() {
-        obfuscated_input[i] = obfuscate_control_flow(obfuscated_input[i], OBFUSCATION_ROUNDS);
+    for byte in &mut obfuscated_input {
+        *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS);
     }
     let ct = cipher
         .encrypt(nonce, obfuscated_input.as_slice())
         .map_err(|_| RustcryptError::Encrypt)?;
     let mut obfuscated_ct = ct;
-    for i in 0..obfuscated_ct.len() {
-        obfuscated_ct[i] = obfuscate_control_flow(obfuscated_ct[i], OBFUSCATION_ROUNDS);
+    for byte in &mut obfuscated_ct {
+        *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS);
     }
     let mut out = Vec::with_capacity(DEFAULT_NONCE_LEN + obfuscated_ct.len());
     out.extend_from_slice(&nonce_bytes);
@@ -355,8 +350,8 @@ fn hide_triple(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptEr
         .map_err(|_| RustcryptError::Encrypt)?;
 
     let mut obfuscated = stage2.clone();
-    for (i, byte) in obfuscated.iter_mut().enumerate() {
-        *byte ^= stream_mask[i];
+    for (byte, mask) in obfuscated.iter_mut().zip(stream_mask.iter()) {
+        *byte ^= *mask;
     }
 
     let mut out = Vec::with_capacity(16 + obfuscated.len());
@@ -392,14 +387,14 @@ fn reveal_single(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>
     let nonce = Nonce::from_slice(nonce_part);
 
     let mut deobfuscated_ct = ct.to_vec();
-    for i in 0..deobfuscated_ct.len() {
-        deobfuscated_ct[i] = obfuscate_control_flow(deobfuscated_ct[i], OBFUSCATION_ROUNDS);
+    for byte in &mut deobfuscated_ct {
+        *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS);
     }
     let mut pt = cipher
         .decrypt(nonce, deobfuscated_ct.as_slice())
         .map_err(|_| RustcryptError::Decrypt)?;
-    for i in 0..pt.len() {
-        pt[i] = obfuscate_control_flow(pt[i], OBFUSCATION_ROUNDS);
+    for byte in &mut pt {
+        *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS);
     }
     Ok(Zeroizing::new(pt))
 }
@@ -435,8 +430,8 @@ fn reveal_triple(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>
     hk.expand(b"triple/mask", &mut stream_mask)
         .map_err(|_| RustcryptError::Decrypt)?;
     let mut deobfuscated = obfuscated.to_vec();
-    for (i, byte) in deobfuscated.iter_mut().enumerate() {
-        *byte ^= stream_mask[i];
+    for (byte, mask) in deobfuscated.iter_mut().zip(stream_mask.iter()) {
+        *byte ^= *mask;
     }
     reveal_double(&deobfuscated, key)
 }
@@ -452,8 +447,8 @@ fn hide_military(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, Rustcrypt
     let military_secret = SecretVec::new(military_key.to_vec());
     let military_encrypted = hide_triple(&triple_encrypted, &military_secret)?;
     let mut final_obfuscated = military_encrypted;
-    for i in 0..final_obfuscated.len() {
-        final_obfuscated[i] = obfuscate_control_flow(final_obfuscated[i], OBFUSCATION_ROUNDS * 2);
+    for byte in &mut final_obfuscated {
+        *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS * 2);
     }
     let junk_data = generate_junk_data();
     let mut output = Vec::with_capacity(final_obfuscated.len() + junk_data.len() + 4 + 16);
@@ -478,8 +473,8 @@ fn reveal_military(
     let after_junk = &input[4 + junk_len..];
     let (salt_part, encrypted_data) = after_junk.split_at(16);
     let mut deobfuscated = encrypted_data.to_vec();
-    for i in 0..deobfuscated.len() {
-        deobfuscated[i] = obfuscate_control_flow(deobfuscated[i], OBFUSCATION_ROUNDS * 2);
+    for byte in &mut deobfuscated {
+        *byte = obfuscate_control_flow(*byte, OBFUSCATION_ROUNDS * 2);
     }
     let hk = Hkdf::<Sha256>::new(Some(salt_part), key.expose_secret());
     let mut military_key = [0u8; 32];
@@ -623,6 +618,7 @@ impl Drop for ObfuscatedRustcrypt {
 }
 
 pub use secrecy::SecretVec as SecretVecAlias;
+pub use rustcrypt_ct_macros::{obf_lit, obf_lit_array, obf_lit_bytes, obf_lit_cstr};
 
 #[macro_export]
 macro_rules! encrypt_literal {

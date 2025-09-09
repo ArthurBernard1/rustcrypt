@@ -1,6 +1,6 @@
 [package]
 name = "rustcrypt"
-version = "0.1.0-beta.2"
+version = "0.2.0-beta.1"
 edition = "2021"
 authors = ["Arthur Bernard"]
 description = "Runtime-safe AES-GCM encryption for protecting secrets in Rust applications"
@@ -30,7 +30,8 @@ hkdf = "0.12"
 sha2 = "0.10"
 base64 = "0.22"
 secrecy = "0.8"
-
+rustcrypt-ct-macros = { path = "rustcrypt-ct-macros" }
+pbkdf2 = "0.12"
 
 [lib]
 name = "rustcrypt"

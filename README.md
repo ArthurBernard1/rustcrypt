@@ -50,7 +50,7 @@ fn main() {
 
     {
         let decrypted_key = reveal(&api_key, &key).unwrap();
-        println!("API Key: {}", String::from_utf8(decrypted_key.to_vec()).unwrap());
+        let _ = decrypted_key;
     }
 
     api_key = hide(b"sk-1234567890abcdef1234567890abcdef", &key).unwrap();
@@ -68,33 +68,18 @@ fn main() {
         true
     ).unwrap();
 
-    let db_password: StackSecret<256> = rustcrypt
-        .hide_stack(b"SuperSecretDBPassword123!")
-        .unwrap();
-
+    let db_password: StackSecret<256> = rustcrypt.hide_stack(b"SuperSecretDBPassword123!").unwrap();
     let decrypted = rustcrypt.reveal_bytes(db_password.as_slice()).unwrap();
-    println!("Connecting to database with password: {}", 
-             String::from_utf8(decrypted.to_vec()).unwrap());
+    let _ = decrypted;
 }
 ```
 
 ### Webhook URLs and Tokens
 ```rust
-use rustcrypt::{hide_layered, reveal_layered, EncryptionLayers};
-use secrecy::SecretVec;
-use rand::Rng;
+use rustcrypt::obf_lit;
 
 fn main() {
-    let key = SecretVec::new(rand::thread_rng().gen::<[u8;32]>().to_vec());
-    
-    let webhook_url = "https://thiswouldbeyourtypicalapiserver/webhook?token=abc123xyz789&user=admin";
-    let encrypted_webhook = hide_layered(webhook_url.as_bytes(), &key, EncryptionLayers::Triple).unwrap();
-    
-    {
-        let decrypted_webhook = reveal_layered(&encrypted_webhook, &key, EncryptionLayers::Triple).unwrap();
-        let url = String::from_utf8(decrypted_webhook.to_vec()).unwrap();
-        println!("Sending data to: {}", url);
-    }
+    println!("{}", obf_lit!("Hello, World!"));
 }
 ```
 
@@ -105,13 +90,37 @@ use rustcrypt::{Rustcrypt, EncryptionLayers};
 fn main() {
     let rustcrypt = Rustcrypt::new(None).unwrap();
     
-    // Hide session cookie
     let session_cookie = "session_id=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
     let encrypted_cookie = rustcrypt.hide(session_cookie).unwrap();
-    
-    // Use the cookie
     let decrypted_cookie = rustcrypt.reveal(&encrypted_cookie).unwrap();
-    println!("Session Cookie: {}", decrypted_cookie);
+    let _ = decrypted_cookie;
+}
+```
+
+### Compile-time obfuscated literals
+```rust
+use rustcrypt::{obf_lit, obf_lit_bytes, obf_lit_cstr, obf_lit_array};
+
+fn main() {
+    let s = obf_lit!("hello");
+    let b = obf_lit_bytes!(b"bytes");
+    let c = obf_lit_cstr!("zero\0term");
+    let (obf, key) = obf_lit_array!(b"raw");
+    let _ = (s, b, c, obf, key);
+}
+```
+
+### Runtime obfuscation (strings/bytes)
+```rust
+use rustcrypt::obf::text::TextObfuscator;
+
+fn main() {
+    let o = TextObfuscator::new(b"pass").with_salt_length(8).with_iterations(2000);
+    let s = o.obfuscate("secret").unwrap();
+    let p = o.unobfuscate(&s).unwrap();
+    let bx = o.obfuscate_bytes(b"blob").unwrap();
+    let pb = o.unobfuscate_bytes(&bx).unwrap();
+    let _ = (p, pb);
 }
 ```
 
@@ -151,7 +160,7 @@ Add rustcrypt to your Cargo.toml:
 
 ```toml
 [dependencies]
-rustcrypt = "0.1.0-beta.2"
+rustcrypt = "0.2.0-beta.1"
 secrecy = "0.8"
 rand = "0.8"
 ```
