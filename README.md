@@ -1,175 +1,300 @@
-# RustCrypt
+# rustcrypt
 
-<div align="center">
+[![crates.io](https://img.shields.io/crates/v/rustcrypt.svg)](https://crates.io/crates/rustcrypt)
+[![docs.rs](https://docs.rs/rustcrypt/badge.svg)](https://docs.rs/rustcrypt)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# **RustCrypt** - Advanced Runtime String Obfuscation
+Macro-first encryption and obfuscation library for Rust.
+Protect your source code from reverse engineering with compile-time string obfuscation, automatic struct encryption, and control flow obfuscation powered by procedural macros.
 
-[![Crates.io](https://img.shields.io/crates/v/rustcrypt.svg)](https://crates.io/crates/rustcrypt)
-[![Documentation](https://docs.rs/rustcrypt/badge.svg)](https://docs.rs/rustcrypt)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Security](https://img.shields.io/badge/security-military%20grade-red.svg)](https://github.com/ArthurBernard1/rustcrypt)
+---
 
-*Protect your secrets with advanced encryption layers*
+## Features
 
-</div>
+- Compile-time string obfuscation
+- Automatic struct encryption via derive
+- Control flow obfuscation
+- Multiple encryption layers
+- Zero runtime dependencies
+- Rustfuscator-inspired API
 
-A production-ready Rust library for runtime string obfuscation using memory-safe AES-GCM encryption. Designed to protect sensitive strings such as API keys, tokens, passwords, and webhook URLs in production environments. Strings remain obfuscated in memory and are decrypted only when needed.
+## Quick Start
 
-## Key Features
+Add to your `Cargo.toml`:
 
-### Advanced Encryption
-- **Multi-layer encryption**: Single, Double, Triple, and Military-grade layers
-- **Per-session ephemeral keys**: Each execution generates unique runtime keys
-- **Bit-level key scattering**: Keys fragmented across random memory positions
-- **Control flow obfuscation**: Junk instructions to confuse reverse engineering
-- **Key derivation**: HKDF-derived subkeys with per-message salts; additional time-based derivation used in obfuscated keys
+```toml
+[dependencies]
+rustcrypt = "0.3.0-beta.1"
+```
 
-### Memory Security
-- **Stack allocation**: Short secrets use stack memory to minimize heap exposure
-- **Automatic zeroization**: All sensitive data cleared on drop using `zeroize`
-- **Zero-copy operations**: Minimize memory copies and exposure windows
+### Basic Usage
 
-### Developer Experience
-- **Clean API**: Simple `hide()` and `reveal()` functions
-- **Production-ready**: Battle-tested for crates.io deployment
-- **Comprehensive documentation**: Full examples and API reference
-- **Easy integration**: Drop-in replacement for plain strings
-
-## Usage Examples
-
-### Securing API Keys
 ```rust
-use rustcrypt::{hide, reveal};
-use secrecy::SecretVec;
-use rand::Rng;
+use rustcrypt::{obfuscate_string, obfuscate_flow, Obfuscate};
 
 fn main() {
-    let key = SecretVec::new(rand::thread_rng().gen::<[u8;32]>().to_vec());
-
-    let mut api_key = hide(b"sk-1234567890abcdef1234567890abcdef", &key).unwrap();
-
-    {
-        let decrypted_key = reveal(&api_key, &key).unwrap();
-        let _ = decrypted_key;
+    let secret = obfuscate_string!("my secret password");
+    obfuscate_flow!();
+    #[derive(Obfuscate)]
+    struct UserData {
+        name: String,
+        age: u32,
     }
-
-    api_key = hide(b"sk-1234567890abcdef1234567890abcdef", &key).unwrap();
+    let user = ObfuscatedUserData::new_clear("Alice", 30);
+    let clear_data = user.get_clear();
 }
 ```
 
-### Database Credentials Protection
+## API Reference
+
+### String Obfuscation Macros
+
+#### `obfuscate_string!`
+
+Obfuscates a string literal at compile time.
+
 ```rust
-use rustcrypt::{Rustcrypt, EncryptionLayers, StackSecret};
+use rustcrypt::obfuscate_string;
 
-fn main() {
-    let rustcrypt = Rustcrypt::with_config(
-        None, 
-        EncryptionLayers::Military, 
-        true
-    ).unwrap();
-
-    let db_password: StackSecret<256> = rustcrypt.hide_stack(b"SuperSecretDBPassword123!").unwrap();
-    let decrypted = rustcrypt.reveal_bytes(db_password.as_slice()).unwrap();
-    let _ = decrypted;
-}
+let secret = obfuscate_string!("sensitive data");
 ```
 
-### Webhook URLs and Tokens
+#### `obfuscate_bytes!`
+
+Obfuscates a byte string literal at compile time.
+
 ```rust
-use rustcrypt::obf_lit;
+use rustcrypt::obfuscate_bytes;
 
-fn main() {
-    println!("{}", obf_lit!("Hello, World!"));
-}
+let secret_bytes = obfuscate_bytes!(b"binary data");
 ```
 
-### Session Cookies and JWT Tokens
+### Control Flow Obfuscation
+
+#### `obfuscate_flow!`
+
+Inserts opaque control flow to make reverse engineering more difficult.
+
 ```rust
-use rustcrypt::{Rustcrypt, EncryptionLayers};
+use rustcrypt::obfuscate_flow;
 
-fn main() {
-    let rustcrypt = Rustcrypt::new(None).unwrap();
-    
-    let session_cookie = "session_id=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
-    let encrypted_cookie = rustcrypt.hide(session_cookie).unwrap();
-    let decrypted_cookie = rustcrypt.reveal(&encrypted_cookie).unwrap();
-    let _ = decrypted_cookie;
-}
+obfuscate_flow!();
+obfuscate_flow!();
 ```
 
-### Compile-time obfuscated literals
+### Automatic Struct Encryption
+
+#### `#[derive(Obfuscate)]`
+
+Automatically generates encrypted versions of structs.
+
+```rust
+use rustcrypt::Obfuscate;
+
+#[derive(Obfuscate)]
+struct Config {
+    api_key: String,
+    database_url: String,
+    timeout: u32,
+}
+
+let config = ObfuscatedConfig::new_clear(
+    "sk-1234567890abcdef",
+    "postgresql://localhost:5432/mydb", 
+    30
+);
+
+let clear_config = config.get_clear();
+```
+
+**Supported field types:**
+- `String` / `&str`
+- `u32`, `u64`
+- `i32`, `i64` 
+- `bool`
+
+### Legacy Compile-Time Macros
+
+The original compile-time macros are still available:
+
 ```rust
 use rustcrypt::{obf_lit, obf_lit_bytes, obf_lit_cstr, obf_lit_array};
 
-fn main() {
     let s = obf_lit!("hello");
     let b = obf_lit_bytes!(b"bytes");
     let c = obf_lit_cstr!("zero\0term");
     let (obf, key) = obf_lit_array!(b"raw");
-    let _ = (s, b, c, obf, key);
-}
 ```
 
-### Runtime obfuscation (strings/bytes)
+## Architecture
+
+Rustcrypt is built as a workspace with specialized crates:
+
+```
+rustcrypt/
+├── rustcrypt-core/        # Core encryption and obfuscation functionality
+├── rustcrypt-macros/      # Function-like procedural macros
+├── rustcrypt-derive/      # Derive macros for automatic struct encryption
+├── rustcrypt-ct-macros/   # Compile-time literal obfuscation macros
+└── examples/              # Usage examples
+```
+
+### How It Works
+
+1. Compile-time encryption
+2. Runtime decryption
+3. Zero runtime cost
+4. Memory safety
+
+## Examples
+
+### Basic String Obfuscation
+
 ```rust
-use rustcrypt::obf::text::TextObfuscator;
+use rustcrypt::obfuscate_string;
 
 fn main() {
-    let o = TextObfuscator::new(b"pass").with_salt_length(8).with_iterations(2000);
-    let s = o.obfuscate("secret").unwrap();
-    let p = o.unobfuscate(&s).unwrap();
-    let bx = o.obfuscate_bytes(b"blob").unwrap();
-    let pb = o.unobfuscate_bytes(&bx).unwrap();
-    let _ = (p, pb);
+    let password = obfuscate_string!("admin123");
+    let api_key = obfuscate_string!("sk-1234567890abcdef");
 }
 ```
 
+### Complex Struct Encryption
 
-## API Reference
+```rust
+use rustcrypt::Obfuscate;
 
-### Core Functions
-- `hide(input: &[u8], key: &SecretVec<u8>) -> Result<Vec<u8>, RustcryptError>` — Basic encryption
-- `reveal(input: &[u8], key: &SecretVec<u8>) -> Result<Zeroizing<Vec<u8>>, RustcryptError>` — Basic decryption
-- `hide_layered(input: &[u8], key: &SecretVec<u8>, layers: EncryptionLayers) -> Result<Vec<u8>, RustcryptError>` — Configurable encryption
-- `reveal_layered(input: &[u8], key: &SecretVec<u8>, layers: EncryptionLayers) -> Result<Zeroizing<Vec<u8>>, RustcryptError>` — Configurable decryption
+#[derive(Obfuscate)]
+struct DatabaseConfig {
+    host: String,
+    port: u32,
+    username: String,
+    password: String,
+    ssl_enabled: bool,
+}
 
-### Rustcrypt Struct
-Main struct providing runtime string obfuscation functionality.
+#[derive(Obfuscate)]
+struct AppConfig {
+    app_name: String,
+    version: String,
+    database: String,
+}
 
-- `new(option: Option<&[u8]>) -> Result<Self, RustcryptError>` — creates a new instance with optional key
-- `with_config(key: Option<&[u8]>, layers: EncryptionLayers, ephemeral: bool) -> Result<Self, RustcryptError>` — full configuration
-- `hide(&self, input: &str) -> Result<Vec<u8>, RustcryptError>` — obfuscates a string
-- `hide_bytes(&self, input: &[u8]) -> Result<Vec<u8>, RustcryptError>` — obfuscates bytes
-- `reveal(&self, input: &[u8]) -> Result<String, RustcryptError>` — decrypts to string
-- `reveal_bytes(&self, input: &[u8]) -> Result<Zeroizing<Vec<u8>>, RustcryptError>` — decrypts to bytes
-- `hide_stack<const N: usize>(&self, input: &[u8]) -> Result<StackSecret<N>, RustcryptError>` — stack allocation
-
-### Types
-- `EncryptionLayers` — Single, Double, Triple, or Military layer encryption
-- `StackSecret<N>` — Stack-allocated secret with automatic zeroization
-- `RustcryptError` — Error types for all operations
-
-### Constants
-- `DEFAULT_KEY_LEN` — default runtime key length (32 bytes)
-- `DEFAULT_NONCE_LEN` — AES-GCM nonce length (12 bytes)
-- `MAX_STACK_SECRET_LEN` — maximum size for stack allocation (256 bytes)
-
-## Quick Start
-
-Add rustcrypt to your Cargo.toml:
-
-```toml
-[dependencies]
-rustcrypt = "0.2.0-beta.1"
-secrecy = "0.8"
-rand = "0.8"
+fn main() {
+    let db_config = ObfuscatedDatabaseConfig::new_clear(
+        "localhost",
+        5432,
+        "admin",
+        "secret_password",
+        true
+    );
+    
+    let app_config = ObfuscatedAppConfig::new_clear("MyApp", "1.0.0", "db");
+}
 ```
 
-## Security Guarantees
+### Layered Protection
 
-- **Memory Safety**: All sensitive data is automatically zeroized on drop
-- **Ephemeral Keys**: Each session generates unique keys (when enabled)
-- **Stack Allocation**: Short secrets avoid heap exposure
-- **Configurable Layers**: Choose encryption complexity based on threat model
+```rust
+use rustcrypt::{obfuscate_string, obfuscate_flow, Obfuscate};
 
-RustCrypt is production-ready, thoroughly auditable, and ready for crates.io deployment. All examples are fully functional and ready for immediate use in your projects.
+fn main() {
+    obfuscate_flow!();
+    
+    let sensitive_data = obfuscate_string!("credit_card=4111111111111111");
+    
+    #[derive(Obfuscate)]
+    struct PaymentInfo {
+        card_number: String,
+        cvv: String,
+    }
+    
+    let payment = ObfuscatedPaymentInfo::new_clear(&sensitive_data, "123");
+    
+    obfuscate_flow!();
+    let _clear_payment = payment.get_clear();
+}
+```
+
+## Advanced Usage
+
+### Custom Encryption Layers
+
+```rust
+use rustcrypt_core::{Rustcrypt, EncryptionLayers};
+
+let crypto = Rustcrypt::with_config(
+    Some(b"your-32-byte-key-here-123456789012"),
+    EncryptionLayers::Military,
+    false
+)?;
+
+let encrypted = crypto.hide("sensitive data")?;
+let decrypted = crypto.reveal(&encrypted)?;
+```
+
+### Stack-Based Secrets
+
+```rust
+use rustcrypt_core::{Rustcrypt, StackSecret};
+
+let crypto = Rustcrypt::new(None)?;
+let stack_secret: StackSecret<256> = crypto.hide_stack(b"small secret")?;
+```
+
+### Additional Macros
+
+```rust
+use rustcrypt::{
+    obfuscate_bytes, obfuscate_cstr, obfuscate_bytes_array, obfuscate_const_bytes,
+    obfuscate_flow_heavy, obfuscate_branch, obfuscate_select, obfuscate_loop, obfuscate_fn,
+};
+
+let _b = obfuscate_bytes!(b"data");
+let _c = obfuscate_cstr!("z");
+let _arr = obfuscate_bytes_array!([1,2,3]);
+let _cb = obfuscate_const_bytes!(b"const");
+obfuscate_flow_heavy!();
+let _x = if obfuscate_branch!(1 + 1 == 2) { 1 } else { 0 };
+let _y: u32 = obfuscate_select!((true, || { 10u32 }, || { 20u32 }));
+obfuscate_loop!((3, { let _t = i; std::hint::black_box(_t); }));
+
+#[obfuscate_fn]
+fn f(n: u64) -> u64 { n.wrapping_mul(3) }
+```
+
+## Security Considerations
+
+- **Not a silver bullet**: Obfuscation increases complexity but doesn't guarantee security
+- **Combine with other techniques**: Use with binary stripping, anti-debugging, etc.
+- **Key management**: Ensure proper key derivation and storage
+- **Memory safety**: All secrets are zeroized when dropped
+
+## Performance
+
+- **Zero runtime overhead**: All obfuscation happens at compile time
+- **Minimal binary size increase**: Only encrypted data is added
+- **Fast decryption**: Optimized for runtime performance
+- **Memory efficient**: Automatic cleanup of sensitive data
+
+## Requirements
+
+- Rust 1.70+
+- No external dependencies for basic usage
+- Optional features for advanced functionality
+
+## Contributing
+
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Inspired by rustfuscator
+- Built on top of proven cryptographic libraries
+- Community feedback and contributions
+
+---

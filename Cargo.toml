@@ -1,17 +1,26 @@
-[package]
-name = "rustcrypt"
-version = "0.2.0-beta.1"
+[workspace]
+members = [
+    "rustcrypt-core",
+    "rustcrypt-macros", 
+    "rustcrypt-derive",
+    "rustcrypt-ct-macros"
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.3.0-beta.1"
 edition = "2021"
 authors = ["Arthur Bernard"]
-description = "Runtime-safe AES-GCM encryption for protecting secrets in Rust applications"
+description = "Macro-first encryption and obfuscation library for Rust"
 license = "MIT"
 readme = "README.md"
 documentation = "https://docs.rs/rustcrypt"
 keywords = [
     "crypto",
-    "encryption",
+    "encryption", 
     "aes-gcm",
     "obfuscator",
+    "macros",
     "security",
 ]
 categories = [
@@ -19,25 +28,31 @@ categories = [
     "security",
 ]
 
-[dependencies]
-aes-gcm = { version = "0.10", features = ["aes"] }
-chacha20poly1305 = { version = "0.10", features = ["alloc"] }
-rand = "0.8"
-rand_core = "0.6"
-getrandom = "0.2"
-zeroize = { version = "1.7", features = ["zeroize_derive"] }
-hkdf = "0.12"
-sha2 = "0.10"
-base64 = "0.22"
-secrecy = "0.8"
-rustcrypt-ct-macros = { version = "0.1.0", path = "rustcrypt-ct-macros" }
-pbkdf2 = "0.12"
-
-[lib]
+[package]
 name = "rustcrypt"
-path = "src/lib.rs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Macro-first encryption and obfuscation library for Rust"
+license.workspace = true
+readme.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+rustcrypt-core = { version = "0.3.0-beta.1" }
+rustcrypt-macros = { version = "0.3.0-beta.1" }
+rustcrypt-derive = { version = "0.3.0-beta.1" }
+rustcrypt-ct-macros = { version = "0.1.0" }
 
 [features]
 default = ["hardware-keys", "ephemeral-sessions"]
 ephemeral-sessions = []
 hardware-keys = []
+
+[patch.crates-io]
+rustcrypt-core = { path = "rustcrypt-core" }
+rustcrypt-macros = { path = "rustcrypt-macros" }
+rustcrypt-derive = { path = "rustcrypt-derive" }
+rustcrypt-ct-macros = { path = "rustcrypt-ct-macros" }

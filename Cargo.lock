@@ -295,7 +295,17 @@ dependencies = [
 
 [[package]]
 name = "rustcrypt"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
+dependencies = [
+ "rustcrypt-core",
+ "rustcrypt-ct-macros",
+ "rustcrypt-derive",
+ "rustcrypt-macros",
+]
+
+[[package]]
+name = "rustcrypt-core"
+version = "0.3.0-beta.1"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -305,7 +315,6 @@ dependencies = [
  "pbkdf2",
  "rand",
  "rand_core",
- "rustcrypt-ct-macros",
  "secrecy",
  "sha2",
  "zeroize",
@@ -317,6 +326,26 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "rustcrypt-derive"
+version = "0.3.0-beta.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustcrypt-core",
+ "syn",
+]
+
+[[package]]
+name = "rustcrypt-macros"
+version = "0.3.0-beta.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustcrypt-core",
  "syn",
 ]
 
