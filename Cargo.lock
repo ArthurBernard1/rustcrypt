@@ -297,15 +297,34 @@ dependencies = [
 name = "rustcrypt"
 version = "0.3.0-beta.1"
 dependencies = [
- "rustcrypt-core",
- "rustcrypt-ct-macros",
- "rustcrypt-derive",
- "rustcrypt-macros",
+ "rustcrypt-core 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustcrypt-ct-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustcrypt-derive 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustcrypt-macros 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rustcrypt-core"
 version = "0.3.0-beta.1"
+dependencies = [
+ "aes-gcm",
+ "base64",
+ "chacha20poly1305",
+ "getrandom",
+ "hkdf",
+ "pbkdf2",
+ "rand",
+ "rand_core",
+ "secrecy",
+ "sha2",
+ "zeroize",
+]
+
+[[package]]
+name = "rustcrypt-core"
+version = "0.3.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b506e42a17cbfb6dc539ac7022c0c2e2fc822515f5aea5e9dc2164de45c4e186"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -330,12 +349,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustcrypt-ct-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9022d0791a0aafc294d1ce120db63339887fe150b69ddd98f82bcc661f3c0464"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "rustcrypt-derive"
 version = "0.3.0-beta.1"
 dependencies = [
  "proc-macro2",
  "quote",
- "rustcrypt-core",
+ "rustcrypt-core 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn",
+]
+
+[[package]]
+name = "rustcrypt-derive"
+version = "0.3.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "246b92f9f1a7dba2ddea39a72abc86f7608c7d1abf9305a9cf2a4ad0dad13aea"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustcrypt-core 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn",
 ]
 
@@ -345,7 +387,19 @@ version = "0.3.0-beta.1"
 dependencies = [
  "proc-macro2",
  "quote",
- "rustcrypt-core",
+ "rustcrypt-core 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn",
+]
+
+[[package]]
+name = "rustcrypt-macros"
+version = "0.3.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5e4abff2e4012f81d1a991abe70b58c724534c710d7304134a6c5daca2d4e25"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustcrypt-core 0.3.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn",
 ]
 
